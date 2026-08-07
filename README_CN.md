@@ -1,5 +1,8 @@
 # 这是一个 `json-event-parser` 的功能扩展
 
+[![Latest Version](https://img.shields.io/crates/v/json-event-parser-blocks.svg)](https://crates.io/crates/json-event-parser-blocks)
+[![Released API docs](https://docs.rs/json-event-parser/badge.svg)](https://docs.rs/json-event-parser-blocks)
+
 1. 增加了`Skipper`类型,用于从event stream中跳过一整个object或者array
 2. 增加了对`serde`库的支持,可以方便的将event stream与`serde`类型互相转化
 

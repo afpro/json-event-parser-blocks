@@ -1,5 +1,8 @@
 # Extension for `json-event-parser`
 
+[![Latest Version](https://img.shields.io/crates/v/json-event-parser-blocks.svg)](https://crates.io/crates/json-event-parser-blocks)
+[![Released API docs](https://docs.rs/json-event-parser/badge.svg)](https://docs.rs/json-event-parser-blocks)
+
 1. Added the `Skipper` type, which allows skipping entire objects or arrays from an event stream.
 2. Added support for the `serde` crate, enabling convenient conversion between event streams and `serde`-compatible types.
 

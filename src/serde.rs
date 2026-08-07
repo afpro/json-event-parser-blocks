@@ -1,5 +1,4 @@
 #![cfg(feature = "serde")]
-/// a
 
 use std::{error::Error, fmt::Display};
 

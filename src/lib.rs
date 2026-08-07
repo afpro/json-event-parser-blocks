@@ -4,7 +4,7 @@ mod skipper;
 
 use json_event_parser::JsonEvent;
 #[cfg(feature = "serde")]
-pub use serde::{JsonEventSlice, JsonEventSource, JsonValueSink, JsonValueSource, SerDeIoError};
+pub use serde::{JsonEventSlice, JsonEventSource, JsonSerializer, JsonDeserializer, SerDeIoError};
 pub use skipper::{SkipError, Skipper};
 
 pub fn event_name(event: &JsonEvent<'_>) -> &'static str {

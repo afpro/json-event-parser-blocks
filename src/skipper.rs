@@ -28,6 +28,7 @@ impl Default for Skipper {
 
 impl Skipper {
     #[inline]
+    #[doc = "create new Skipper instance"]
     pub const fn new() -> Self {
         Self {
             has_skipped_value: false,
@@ -36,15 +37,18 @@ impl Skipper {
     }
 
     #[inline]
+    #[doc = "in skipping state (between object/array, or just start without any value skipped)"]
     pub fn skipping(&self) -> bool {
         !self.has_skipped_value || self.depth > 0
     }
 
+    #[doc = "reset to init state, for reuse. (create new one is cheap, this is not necessary)"]
     pub fn reset(&mut self) {
         self.has_skipped_value = false;
         self.depth = 0;
     }
 
+    #[doc = "feed new event to Skipper, return `skipping()`."]
     pub fn on_event(&mut self, event: &JsonEvent<'_>) -> Result<bool, SkipError> {
         if !self.skipping() {
             return Err(SkipError::SkipAlreadyDone);

@@ -4,7 +4,7 @@
 use std::{assert_matches, borrow::Cow};
 
 use json_event_parser::{JsonEvent, ReaderJsonParser, WriterJsonSerializer};
-use json_event_parser_blocks::{owned_event, JsonValueSink, JsonValueSource, Skipper};
+use json_event_parser_blocks::{owned_event, JsonSerializer, JsonDeserializer, Skipper};
 use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -55,7 +55,7 @@ fn sink_object() {
     let mut write = Vec::<u8>::new();
     let mut json_writer = WriterJsonSerializer::new(&mut write);
     demo_input
-        .serialize(JsonValueSink::new(&mut json_writer))
+        .serialize(JsonSerializer::new(&mut json_writer))
         .unwrap();
 
     let demo_decode = serde_json::from_slice::<DemoStruct>(&write).unwrap();
@@ -68,7 +68,7 @@ fn source_object() {
     let demo_json = serde_json::to_string(&demo_input).unwrap();
 
     let mut json_reader = ReaderJsonParser::new(demo_json.as_bytes());
-    let demo_decoded = DemoStruct::deserialize(JsonValueSource::new(&mut json_reader)).unwrap();
+    let demo_decoded = DemoStruct::deserialize(JsonDeserializer::new(&mut json_reader)).unwrap();
     assert_eq!(demo_input, demo_decoded);
 }
 
@@ -92,7 +92,7 @@ fn part_source_object() {
         json_reader.parse_next().unwrap(),
         JsonEvent::ObjectKey(Cow::Borrowed("y"))
     );
-    let demo_decoded = DemoStruct::deserialize(JsonValueSource::new(&mut json_reader)).unwrap();
+    let demo_decoded = DemoStruct::deserialize(JsonDeserializer::new(&mut json_reader)).unwrap();
     assert_eq!(demo_input, demo_decoded);
     assert_eq!(
         json_reader.parse_next().unwrap(),
@@ -138,7 +138,7 @@ fn skip_and_consume() {
         events.push(owned_event(event.clone()));
     }
 
-    let demo_decoded = DemoStruct::deserialize(JsonValueSource::new(&mut events)).unwrap();
+    let demo_decoded = DemoStruct::deserialize(JsonDeserializer::new(&mut events)).unwrap();
 
     assert_eq!(demo_input, demo_decoded);
     assert_eq!(

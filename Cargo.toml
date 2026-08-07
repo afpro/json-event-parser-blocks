@@ -2,6 +2,11 @@
 name = "json-event-parser-blocks"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+homepage = "https://github.com/afpro/json-event-parser-blocks"
+repository = "https://github.com/afpro/json-event-parser-blocks"
+description = "add 'skipper' and serde support for json-event-parser"
+readme = "README.md"
 
 [dependencies]
 json-event-parser = "0.2"

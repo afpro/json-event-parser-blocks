@@ -1,0 +1,15 @@
+[package]
+name = "json-event-parser-blocks"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+json-event-parser = "0.2"
+serde = { version = "1", optional = true }
+thiserror = "2"
+
+[features]
+serde = ["dep:serde"]
+
+[dev-dependencies]
+serde_json = "1"

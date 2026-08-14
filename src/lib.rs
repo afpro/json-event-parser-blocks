@@ -1,3 +1,8 @@
+//! Utilities and serde support for the `json_event_parser` event stream.
+//!
+//! Provides the `Skipper` for skipping whole values, helper functions for
+//! `JsonEvent`, and (with the `serde` feature) `JsonSerializer` / `JsonDeserializer`.
+
 #[cfg(feature = "serde")]
 mod serde;
 mod skipper;
@@ -7,6 +12,7 @@ use json_event_parser::JsonEvent;
 pub use serde::{JsonEventSlice, JsonEventSource, JsonSerializer, JsonDeserializer, SerDeIoError};
 pub use skipper::{SkipError, Skipper};
 
+/// Returns the static variant name of a `JsonEvent` (e.g. `"StartObject"`).
 pub fn event_name(event: &JsonEvent<'_>) -> &'static str {
     match event {
         JsonEvent::String(_) => "String",
@@ -22,6 +28,10 @@ pub fn event_name(event: &JsonEvent<'_>) -> &'static str {
     }
 }
 
+/// Converts a borrowed `JsonEvent` into an owned `JsonEvent<'static>`.
+///
+/// Borrowed string/number payloads are copied into owned data so the result
+/// no longer borrows from the input.
 pub fn owned_event(event: JsonEvent<'_>) -> JsonEvent<'static> {
     match event {
         JsonEvent::String(v) => JsonEvent::String(v.into_owned().into()),

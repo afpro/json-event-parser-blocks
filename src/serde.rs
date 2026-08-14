@@ -7,21 +7,26 @@ use json_event_parser::JsonParseError;
 pub use ser::JsonSerializer;
 use serde::{de::Error as DeError, ser::Error as SerError};
 
-#[doc = "serde method error enum"]
+/// The error type used by the serde `Serializer`/`Deserializer` implementations in this crate.
+///
+/// Wraps IO errors, JSON parse errors, and arbitrary custom errors.
 #[derive(Debug, thiserror::Error)]
 pub enum SerDeIoError {
+    /// An underlying IO error.
     #[error("io error {}", _0)]
     Io(
         #[source]
         #[from]
         std::io::Error,
     ),
+    /// A JSON parse error from `json_event_parser`.
     #[error("json parse error {}", _0)]
     Parse(
         #[source]
         #[from]
         JsonParseError,
     ),
+    /// A custom error built from an arbitrary boxed error.
     #[error("custom error {}", _0)]
     Custom(
         #[source]
@@ -31,6 +36,7 @@ pub enum SerDeIoError {
 }
 
 impl SerDeIoError {
+    /// Creates a `SerDeIoError` from an IO error kind and an arbitrary error message.
     #[inline]
     pub fn new<E>(kind: std::io::ErrorKind, msg: E) -> Self
     where
@@ -39,11 +45,13 @@ impl SerDeIoError {
         std::io::Error::new(kind, msg.into()).into()
     }
 
+    /// Creates a `SerDeIoError` representing unexpected end of input.
     #[inline]
     pub fn eof() -> Self {
         Self::new(std::io::ErrorKind::UnexpectedEof, "eof")
     }
 
+    /// Creates a `SerDeIoError` from an arbitrary custom error.
     #[inline]
     pub fn custom<E>(msg: E) -> Self
     where
@@ -73,6 +81,7 @@ impl DeError for SerDeIoError {
     }
 }
 
+/// Serialization: `serde::Serialize` -> `JsonSerializer` -> `json_event_parser::WriterJsonSerializer`.
 mod ser {
     use std::{borrow::Cow, io::Write};
 
@@ -94,6 +103,7 @@ mod ser {
     }
 
     impl<'a, W: Write> JsonSerializer<'a, W> {
+        /// Creates a serializer wrapping the given `WriterJsonSerializer`.
         pub fn new(writer: &'a mut WriterJsonSerializer<W>) -> Self {
             Self { writer }
         }
@@ -187,6 +197,7 @@ mod ser {
             Ok(self.writer)
         }
 
+        // Serializes a byte slice as a JSON array of numbers.
         fn serialize_bytes(self, v: &[u8]) -> Result<Self::Ok, Self::Error> {
             self.writer.serialize_event(JsonEvent::StartArray)?;
             self.writer.serialize_event(JsonEvent::EndArray)?;
@@ -417,6 +428,7 @@ mod ser {
     );
 }
 
+/// Deserialization: `JsonEventSource` -> `JsonDeserializer` -> `serde::Deserialize`.
 mod de {
     use std::{
         borrow::Cow,
@@ -440,16 +452,19 @@ mod de {
 
     /// json-event-parser event source, wrapper for `Vec<JsonEvent>`, `&[JsonEvent]`, or `ReaderJsonParser`
     pub trait JsonEventSource {
+        /// Returns the next event from the source, or `JsonEvent::Eof` when exhausted.
         fn next_event(&mut self) -> Result<Cow<'_, JsonEvent<'_>>, JsonParseError>;
     }
 
     impl<R: Read> JsonEventSource for ReaderJsonParser<R> {
+        /// Parses the next event from the underlying reader.
         fn next_event(&mut self) -> Result<Cow<'_, JsonEvent<'_>>, JsonParseError> {
             Ok(Cow::Owned(self.parse_next()?))
         }
     }
 
     impl JsonEventSource for Vec<JsonEvent<'_>> {
+        /// Pops the event from the head of the vector (returns `Eof` when empty).
         fn next_event(&mut self) -> Result<Cow<'_, JsonEvent<'_>>, JsonParseError> {
             Ok(Cow::Owned(if self.is_empty() {
                 JsonEvent::Eof
@@ -472,12 +487,14 @@ mod de {
     }
 
     impl<'a> JsonEventSlice<'a> {
+        /// Creates an event source over the given event slice, starting at its beginning.
         pub const fn new(slice: &'a [JsonEvent<'a>]) -> Self {
             Self { pos: 0, slice }
         }
     }
 
     impl<'a> JsonEventSource for JsonEventSlice<'a> {
+        /// Returns the next event by advancing an index; events are borrowed, so this avoids allocation.
         fn next_event(&mut self) -> Result<Cow<'_, JsonEvent<'_>>, JsonParseError> {
             if self.pos >= self.slice.len() {
                 return Ok(Cow::Owned(JsonEvent::Eof));
@@ -497,10 +514,12 @@ mod de {
     }
 
     impl<'a, S: JsonEventSource> JsonDeserializer<'a, S> {
+        /// Creates a deserializer reading from the given event source.
         pub fn new(source: &'a mut S) -> Self {
             Self { source, peek: None }
         }
 
+        /// Returns a copy of the deserializer with a single peeked (already read) event.
         fn with_peek(self, event: JsonEvent<'static>) -> Self {
             Self {
                 source: self.source,
@@ -508,6 +527,7 @@ mod de {
             }
         }
 
+        /// Like `with_peek`, but a `None` event leaves the deserializer unchanged.
         fn with_opt_peek(self, event: Option<JsonEvent<'static>>) -> Self {
             if let Some(event) = event {
                 self.with_peek(event)
@@ -516,6 +536,7 @@ mod de {
             }
         }
 
+        /// Returns the next event as owned data, taking the peeked event first if present.
         fn own_next_event(mut self) -> Result<Cow<'a, JsonEvent<'a>>, SerDeIoError> {
             if let Some(event) = self.peek.take() {
                 return Ok(Cow::Owned(event));
@@ -524,6 +545,7 @@ mod de {
             self.source.next_event().map_err(Into::into)
         }
 
+        /// Returns the next event, borrowing from the source when possible.
         fn next_event(&mut self) -> Result<Cow<'_, JsonEvent<'_>>, SerDeIoError> {
             if let Some(event) = self.peek.take() {
                 return Ok(Cow::Owned(event));
@@ -532,6 +554,7 @@ mod de {
             self.source.next_event().map_err(Into::into)
         }
 
+        /// Returns the next event as an owned `JsonEvent<'static>` (see `crate::owned_event`).
         fn next_event_static(&mut self) -> Result<JsonEvent<'static>, SerDeIoError> {
             if let Some(event) = self.peek.take() {
                 return Ok(event);
@@ -540,6 +563,7 @@ mod de {
             self.next_event().map(|v| owned_event(v.as_ref().clone()))
         }
 
+        /// Consume a JSON array of numbers into `buf` as bytes, up to the matching `EndArray`.
         fn consume_byte_buf(&mut self, buf: &mut Vec<u8>) -> Result<(), SerDeIoError> {
             loop {
                 match &self.next_event()?.as_ref() {
@@ -566,6 +590,8 @@ mod de {
         }
     }
 
+    /// Macro generating the primitive `deserialize_*` methods:
+    /// a `Number` event is parsed to the target type, a `String` event is parsed as a string.
     macro_rules! primitive_visit {
         ($name:ident, $visit_fn:ident, $visit_ty:ty) => {
             fn $name<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -855,6 +881,7 @@ mod de {
         type Error = SerDeIoError;
         type Variant = Self;
 
+        /// Deserializes the variant name using the peeked event, if any.
         fn variant_seed<V>(mut self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
         where
             V: DeserializeSeed<'de>,
@@ -869,6 +896,10 @@ mod de {
     impl<'a, 'de: 'a, S: JsonEventSource> VariantAccess<'de> for JsonVariantAccess<'a, S> {
         type Error = SerDeIoError;
 
+        /// Handles a unit variant.
+        ///
+        /// In the single-field map form (`{"Variant": null}`) the variant value
+        /// is deserialized from the event stream.
         fn unit_variant(self) -> Result<(), Self::Error> {
             if self.is_unit {
                 return Ok(());
@@ -876,6 +907,7 @@ mod de {
             Deserialize::deserialize(self.source)
         }
 
+        /// Handles a newtype variant by deserializing its payload from the event stream.
         fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
         where
             T: DeserializeSeed<'de>,
@@ -889,6 +921,7 @@ mod de {
             }
         }
 
+        /// Handles a tuple variant as a JSON array.
         fn tuple_variant<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -902,6 +935,7 @@ mod de {
             }
         }
 
+        /// Handles a struct variant as a JSON object with the given field names.
         fn struct_variant<V>(
             self,
             fields: &'static [&'static str],
@@ -923,6 +957,7 @@ mod de {
     impl<'a, 'de: 'a, S: JsonEventSource> MapAccess<'de> for JsonDeserializer<'a, S> {
         type Error = SerDeIoError;
 
+        /// Deserializes the next object key from an `ObjectKey` event, returning `None` at `EndObject`.
         fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
         where
             K: DeserializeSeed<'de>,
@@ -941,6 +976,7 @@ mod de {
             }
         }
 
+        /// Deserializes the value following the last key.
         fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
         where
             V: DeserializeSeed<'de>,
@@ -952,6 +988,7 @@ mod de {
     impl<'a, 'de: 'a, S: JsonEventSource> SeqAccess<'de> for JsonDeserializer<'a, S> {
         type Error = SerDeIoError;
 
+        /// Deserializes the next array element, returning `None` at `EndArray`.
         fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
         where
             T: DeserializeSeed<'de>,
@@ -965,6 +1002,7 @@ mod de {
         }
     }
 
+    /// A parsed JSON number: `i64`, `u64`, or (on integer overflow) `f64`.
     enum JsonNumber {
         I64(i64),
         U64(u64),
@@ -974,6 +1012,7 @@ mod de {
     impl FromStr for JsonNumber {
         type Err = SerDeIoError;
 
+        /// Parses a number literal, falling back to `f64` on integer overflow.
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             let s = s.trim();
             let err = if s.starts_with('-') {
@@ -1003,6 +1042,7 @@ mod de {
     }
 
     impl JsonNumber {
+        /// Visits the visitor with the contained number value.
         fn visit<'de, V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, SerDeIoError> {
             match self {
                 JsonNumber::I64(v) => visitor.visit_i64(v),
@@ -1012,6 +1052,7 @@ mod de {
         }
     }
 
+    /// Builds a `SerDeIoError` describing an unexpected event type, using the visitor's `expecting` for the expected type.
     fn unexpect_type<'de, V: Visitor<'de>>(event_name: &str, visitor: &V) -> SerDeIoError {
         struct ErrMeta<'a, 'de, V: Visitor<'de>> {
             event_name: &'a str,
